@@ -24,9 +24,7 @@ use frame_support::{ensure, fail, pallet_prelude::*, weights::Weight};
 use hp_verifiers::{Verifier, VerifyError};
 use log::debug;
 use risc0_derive::R0Proof;
-use risc0_verifier::{
-    v1_0, v1_1, v1_2, v2_0, v2_1, Journal, SegmentInfo, Verifier as _, Vk as Risc0Vk,
-};
+use risc0_verifier::{v2_1, Journal, SegmentInfo, Verifier as _, Vk as Risc0Vk};
 use sp_core::{Get, H256};
 
 pub mod benchmarking;
@@ -77,10 +75,6 @@ pub struct Risc0<T>;
 
 #[derive(Clone, Debug, PartialEq, Encode, Decode, TypeInfo, R0Proof)]
 pub enum Proof {
-    V1_0(Vec<u8>),
-    V1_1(Vec<u8>),
-    V1_2(Vec<u8>),
-    V2_0(Vec<u8>),
     V2_1(Vec<u8>),
 }
 
@@ -115,10 +109,6 @@ impl R0Proof {
 
     fn verifier(&self) -> Box<dyn risc0_verifier::Verifier> {
         match self {
-            R0Proof::V1_0(_r0_proof) => v1_0().inject_native_poseidon2_if_needed().boxed(),
-            R0Proof::V1_1(_r0_proof) => v1_1().inject_native_poseidon2_if_needed().boxed(),
-            R0Proof::V1_2(_r0_proof) => v1_2().inject_native_poseidon2_if_needed().boxed(),
-            R0Proof::V2_0(_r0_proof) => v2_0().inject_native_poseidon2_if_needed().boxed(),
             R0Proof::V2_1(_r0_proof) => v2_1().inject_native_poseidon2_if_needed().boxed(),
         }
     }
@@ -188,7 +178,7 @@ impl<T: Config> Verifier for Risc0<T> {
         log::trace!("Verifying (native)");
         let journal = Journal::new(pubs.to_vec());
         let proof_len = proof.len();
-        let proof = R0Proof::try_from(proof).map_err(|_| VerifyError::InvalidProofData)?;
+        let proof = R0Proof::try_from(proof).map_err(|_e| VerifyError::InvalidProofData)?;
         let w = proof
             .proof_structure()
             .and_then(Self::verify_weight)
@@ -218,18 +208,6 @@ impl<T: Config> Verifier for Risc0<T> {
 
     fn verifier_version_hash(proof: &Self::Proof) -> H256 {
         let h = match proof {
-            Proof::V1_0(_) => hex_literal::hex!(
-                "df801e3397d2a8fbb77c2fa30c7f7806ee8a60de44cb536108e7ef272618e2da"
-            ),
-            Proof::V1_1(_) => hex_literal::hex!(
-                "2a06d398245e645477a795d1b707344669459840d154e17fde4df2b40eea5558"
-            ),
-            Proof::V1_2(_) => hex_literal::hex!(
-                "5f39e7751602fc8dbc1055078b61e2704565e3271312744119505ab26605a942"
-            ),
-            Proof::V2_0(_) => hex_literal::hex!(
-                "4b591002da5e767a89a636535a1758bd5f5e2677c42811f11b0a6429d2429a1b"
-            ),
             Proof::V2_1(_) => hex_literal::hex!(
                 "545aa3fbe4f28bf5be6831341c3d5ba87b16f10089f8efbcc140060e06fb508b"
             ),
@@ -261,12 +239,6 @@ impl<T: Config> Risc0<T> {
             ("poseidon2", 19) => T::WeightInfo::verify_proof_segment_poseidon2_19(),
             ("poseidon2", 20) => T::WeightInfo::verify_proof_segment_poseidon2_20(),
             ("poseidon2", 21) => T::WeightInfo::verify_proof_segment_poseidon2_21(),
-            ("sha-256", p) if p <= 16 => T::WeightInfo::verify_proof_segment_sha_256_16(),
-            ("sha-256", 17) => T::WeightInfo::verify_proof_segment_sha_256_17(),
-            ("sha-256", 18) => T::WeightInfo::verify_proof_segment_sha_256_18(),
-            ("sha-256", 19) => T::WeightInfo::verify_proof_segment_sha_256_19(),
-            ("sha-256", 20) => T::WeightInfo::verify_proof_segment_sha_256_20(),
-            ("sha-256", 21) => T::WeightInfo::verify_proof_segment_sha_256_21(),
             _ => Err(())?,
         };
         Ok(w)
